@@ -29,6 +29,22 @@ offset_test() ->
     ?assertEqual(10, length(Offsets)),
     ?assertEqual(234300012191, hd(Offsets)).
 
+offsets_default_to_partition_0_test() ->
+    B = kafka_protocol:offset_request(<<"tpc">>, -1, 1),
+    io:format("~p~n", [B]),
+    ?assertEqual(
+      <<0,0,0,23,0,4,0,3,116,112,99,0,0,0,0,255,255,255,255,255,255,255,255,0,0,0,1>>,
+      B
+    ).
+
+offsets_for_partition_test() ->
+    B = kafka_protocol:offset_request(<<"tpc">>, 123, -1, 1),
+    io:format("~p~n", [B]),
+    ?assertEqual(
+      <<0,0,0,23,0,4,0,3,116,112,99,0,0,0,123,255,255,255,255,255,255,255,255,0,0,0,1>>,
+      B
+    ).
+
 
 %% split_data_test() ->
 %%     B1 = <<0,0,0,20,0,203,100,194,139,115,97,111,101,116,117,104,97,115,110,111,

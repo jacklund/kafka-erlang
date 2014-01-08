@@ -4,8 +4,8 @@
 -module(kafka_protocol).
 -author('Knut Nesheim <knutin@gmail.com>').
 
--export([fetch_request/3, fetch_request/4, offset_request/3, offset_request/4]).
--export([parse_messages/1, parse_offsets/1]).
+-export([produce_request/3, fetch_request/3, fetch_request/4, offset_request/3, offset_request/4]).
+-export([encode_messages/1, parse_messages/1, parse_offsets/1]).
 
 -define(FETCH, 1).
 -define(OFFSETS, 4).
@@ -27,7 +27,6 @@ fetch_request(Topic, Partition, Offset, MaxSize) ->
       Offset:64/integer,
       MaxSize:32/integer>>.
 
-
 offset_request(Topic, Time, MaxNumber) ->
     offset_request(Topic, 0, Time, MaxNumber).
 
@@ -41,6 +40,33 @@ offset_request(Topic, Partition, Time, MaxNumber) ->
       Partition:32/integer,
       Time:64/integer,
       MaxNumber:32/integer>>.
+
+produce_request(Topic, Partition, Payloads) when is_list(Payloads) ->
+    RequestType    = 0,
+    Messages       = encode_messages(Payloads),
+    MessagesLength = byte_size(Messages),
+    TopicLength    = byte_size(Topic),
+
+    Request = <<
+        RequestType:16/integer,
+        TopicLength:16/integer,
+        Topic/binary,
+        Partition:32/integer,
+        MessagesLength:32/integer,
+        Messages/binary >>,
+
+    RequestLength  = byte_size(Request),
+    << RequestLength:32/integer, Request/binary >>.
+
+encode_messages(Payloads) ->
+    Messages    = lists:map(fun encode_message/1, Payloads),
+    << << Message/binary >> || Message <- Messages >>.
+
+encode_message(Payload) ->
+    Length   = 1 + 4 + byte_size(Payload),
+    Magic    = 0,
+    Checksum = erlang:crc32(Payload),
+    << Length:32/integer, Magic:8/integer, Checksum:32/integer, Payload/binary >>.
 
 parse_messages(Bs) ->
     parse_messages(Bs, [], 0).

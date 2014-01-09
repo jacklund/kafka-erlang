@@ -5,7 +5,7 @@
 -author('Knut Nesheim <knutin@gmail.com>').
 
 -export([produce_request/3, fetch_request/3, fetch_request/4, offset_request/3, offset_request/4]).
--export([encode_messages/1, parse_messages/1, parse_offsets/1]).
+-export([encode_messages/1, parse_messages/1, parse_offsets/1, error/1]).
 
 -define(FETCH, 1).
 -define(OFFSETS, 4).
@@ -103,3 +103,9 @@ parse_offsets(<<>>, Acc) ->
 parse_offsets(B, Acc) ->
     <<Offset:64/integer, Rest/binary>> = B,
     parse_offsets(Rest, [Offset | Acc]).
+
+error(-1) -> unknown_error;
+error( 1) -> invalid_offset;
+error( 2) -> corrupt_message;
+error( 3) -> invalid_partion;
+error( 4) -> message_larger_than_max_size.

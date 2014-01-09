@@ -70,8 +70,8 @@ handle_call(fetch, _From, #state{current_offset = Offset, partition = Partition}
             {Messages, Size} = kafka_protocol:parse_messages(Data),
             update_offset_callback(State, Offset, Offset + Size),
             {reply, {ok, Messages}, State#state{current_offset = Offset + Size}};
-        {ok, B} ->
-            {reply, {error, B}, State}
+        {ok, <<_:32/integer, ErrorCode:16/integer>>} ->
+            {reply, {error, kafka_protocol:error(ErrorCode)}, State}
     end;
 
 handle_call({get_offsets, Time, MaxNumber}, _From, State) ->

@@ -5,7 +5,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/5, start_link/6, get_current_offset/1, get_offsets/3, fetch/1, set_offset/2]).
+-export([start_link/5, start_link/6, get_current_offset/1, get_offsets/3, fetch/1, fetch_with_offset/1, set_offset/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -16,7 +16,7 @@
                 start_offset,
                 current_offset,
                 offset_cb,
-                max_size = 1048576,
+                max_size = 1024 * 1024,
                 topic,
                 partition
 }).
@@ -42,6 +42,9 @@ set_offset(C, Offset) ->
 
 fetch(C) ->
     gen_server:call(C, fetch).
+
+fetch_with_offset(C) ->
+    gen_server:call(C, fetch_with_offset).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -72,6 +75,13 @@ handle_call(fetch, _From, #state{current_offset = Offset, partition = Partition}
             {reply, {ok, Messages}, State#state{current_offset = Offset + Size}};
         {ok, <<_:32/integer, ErrorCode:16/integer>>} ->
             {reply, {error, kafka_protocol:error(ErrorCode)}, State}
+    end;
+
+handle_call(fetch_with_offset, From, State) ->
+    case handle_call(fetch, From, State) of
+        {reply, {ok, Messages}, StateNew} ->
+            {reply, {ok, {StateNew#state.current_offset, Messages}}, StateNew};
+        Other -> Other
     end;
 
 handle_call({get_offsets, Time, MaxNumber}, _From, State) ->
@@ -118,4 +128,5 @@ update_offset_callback(#state{offset_cb = Callback, topic = Topic, partition = P
     {arity, 3} -> Callback(Topic, OldOffset, NewOffset);
     {arity, 4} -> Callback(Topic, Partition, OldOffset, NewOffset)
   end.
+
 

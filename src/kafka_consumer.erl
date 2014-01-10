@@ -5,7 +5,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/5, start_link/6, get_current_offset/1, get_offsets/3, fetch/1, fetch_with_offset/1, set_offset/2]).
+-export([start_link/5, start_link/6, start_link/7, get_current_offset/1, get_offsets/3, fetch/1, fetch_with_offset/1, set_offset/2]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -29,7 +29,10 @@ start_link(Host, Port, Topic, Offset, OffsetCb) ->
     start_link(Host, Port, Topic, 0, Offset, OffsetCb).
 
 start_link(Host, Port, Topic, Partition, Offset, OffsetCb) ->
-    gen_server:start_link(?MODULE, [Host, Port, Topic, Partition, Offset, OffsetCb], []).
+    start_link(Host, Port, Topic, Partition, Offset, OffsetCb, infinity).
+
+start_link(Host, Port, Topic, Partition, Offset, OffsetCb, Timeout) ->
+    gen_server:start_link(?MODULE, [Host, Port, Topic, Partition, Offset, OffsetCb, Timeout], []).
 
 get_current_offset(C) ->
     gen_server:call(C, get_current_offset).
@@ -50,9 +53,10 @@ fetch_with_offset(C) ->
 %%% gen_server callbacks
 %%%===================================================================
 
-init([Host, Port, Topic, Partition, Offset, OffsetCb]) ->
-    {ok, Socket} = gen_tcp:connect(Host, Port,
-                                   [binary, {active, false}, {packet, raw}]),
+init([Host, Port, Topic, Partition, Offset, OffsetCb, Timeout]) ->
+    {ok, Socket} = gen_tcp:connect(
+        Host, Port, [binary, {active, false}, {packet, raw}], Timeout),
+
     {ok, #state{socket = Socket,
                 topic = Topic,
                 partition = Partition,
@@ -128,5 +132,3 @@ update_offset_callback(#state{offset_cb = Callback, topic = Topic, partition = P
     {arity, 3} -> Callback(Topic, OldOffset, NewOffset);
     {arity, 4} -> Callback(Topic, Partition, OldOffset, NewOffset)
   end.
-
-

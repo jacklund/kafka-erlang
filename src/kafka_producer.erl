@@ -28,7 +28,7 @@ produce(Topic, Partition, Payloads, Server) ->
 
 init([Host, Port]) ->
     {ok, Socket} =
-        gen_tcp:connect(Host, Port, [binary, {active, false}, {packet, raw}]),
+        gen_tcp:connect(Host, Port, [binary, {active, true}, {packet, raw}]),
     {ok, #state{socket = Socket}}.
 
 handle_call({produce, {Topic, Partition, Payloads}}, _From, #state{ socket = Socket } = State) ->
@@ -39,9 +39,8 @@ handle_call({produce, {Topic, Partition, Payloads}}, _From, #state{ socket = Soc
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info(Info, State) ->
-    io:format("info: ~p~n", [Info]),
-    {noreply, State}.
+handle_info({tcp_closed, _}, State) ->
+    {stop, normal, State}.
 
 terminate(_Reason, _State) ->
     ok.

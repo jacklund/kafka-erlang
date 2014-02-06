@@ -34,7 +34,14 @@ init([Host, Port]) ->
 handle_call({produce, {Topic, Partition, Payloads}}, _From, #state{ socket = Socket } = State) ->
     Req = kafka_protocol:produce_request(Topic, Partition, Payloads),
     ok  = gen_tcp:send(Socket, Req),
-    {reply, ok, State}.
+    Reply = receive
+        Msg = {tcp_closed, _} ->
+            self() ! Msg,
+            {error, closed}
+    after 0 ->
+        ok
+    end,
+    {reply, Reply, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.

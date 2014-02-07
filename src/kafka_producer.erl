@@ -28,7 +28,7 @@ produce(Topic, Partition, Payloads, Server) ->
 
 init([Host, Port]) ->
     {ok, Socket} =
-        gen_tcp:connect(Host, Port, [binary, {active, true}, {packet, raw}]),
+        gen_tcp:connect(Host, Port, [binary, {active, true}, {sndbuf, 0}, {buffer, 0}, {packet, raw}]),
     {ok, #state{socket = Socket}}.
 
 handle_call({produce, {Topic, Partition, Payloads}}, _From, #state{ socket = Socket } = State) ->

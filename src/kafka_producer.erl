@@ -4,7 +4,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2, produce/4, get_offsets/5]).
+-export([start_link/2, produce/4, produce_ack/4]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -22,8 +22,8 @@ start_link(Host, Port) ->
 produce(Topic, Partition, Payloads, Server) ->
     gen_server:call(Server, {produce, {Topic, Partition, Payloads}}).
 
-get_offsets(Topic, Partition, Time, MaxNumber, Server) ->
-    gen_server:call(Server, {get_offsets, Topic, Partition, Time, MaxNumber}).
+produce_ack(Topic, Partition, Payloads, Server) ->
+    gen_server:call(Server, {produce_ack, {Topic, Partition, Payloads}}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -36,26 +36,19 @@ init([Host, Port]) ->
 
 handle_call({produce, {Topic, Partition, Payloads}}, _From, #state{ socket = Socket } = State) ->
     Req      = kafka_protocol:produce_request(Topic, Partition, Payloads),
-    TCPReply = gen_tcp:send(Socket, Req),
-    Reply    = receive
-        Msg = {tcp_closed, _} ->
-            self() ! Msg,
-            {error, closed}
-    after 0 ->
-        TCPReply
-    end,
-    {reply, Reply, State};
+    ok = gen_tcp:send(Socket, Req),
+    {reply, ok, State};
 
-handle_call({get_offsets, Topic, Partition, Time, MaxNumber}, _From,
-    State = #state{ socket = Socket }) ->
-
-    Req = kafka_protocol:offset_request(Topic, Partition, Time, MaxNumber),
+handle_call({produce_ack, {Topic, Partition, Payloads}}, _From, #state{ socket = Socket } = State) ->
+    ReqProduce = kafka_protocol:produce_request(Topic, Partition, Payloads),
+    ReqOffset  = kafka_protocol:offset_request(Topic, Partition, -1, 1),
     inet:setopts(Socket,[{active, false}]),
-    ok    = gen_tcp:send(Socket, Req),
+    ok = gen_tcp:send(Socket, << ReqProduce/binary, ReqOffset/binary >>),
     Reply = case gen_tcp:recv(Socket, 6) of
         {ok, <<L:32/integer, 0:16/integer>>} ->
             {ok, Data} = gen_tcp:recv(State#state.socket, L-2),
-            {ok, kafka_protocol:parse_offsets(Data)};
+            [Offset] = kafka_protocol:parse_offsets(Data),
+            {ok ,Offset};
         {ok, B} ->
             {error, B}
     end,
